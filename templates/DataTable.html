@@ -1,0 +1,29 @@
+<table id="DataTable" cellspacing=3><tbody>
+    <tr>
+        <th style="visibility:hidden;">Cid</th>
+        <th onclick="ChangeOrder('2')"><div id="HeaderFirstName">First Name*</div></th>
+        <th onclick="ChangeOrder('3')"><div id="HeaderLastName">Last Name*</div></th>
+        <th onclick="ChangeOrder('4')"><div id="HeaderBirthDate">Birth Date*</div></th>
+        <th onclick="ChangeOrder('5')"><div id="HeaderGender">Gender*</div></th>
+        <th onclick="ChangeOrder('6')"><div id="HeaderEmail">Email*</div></th>
+        <th onclick="ChangeOrder('7')"><div id="HeaderAddress">Address</div></th>
+        <th onclick="ChangeOrder('8')"><div id="HeaderLastUpdate">Last Update</div></th>
+    </tr>
+    {{ if .Customers}} {{range .Customers}}
+    <tr>
+        <td style="visibility:hidden;">{{.Cid}}</td>
+        <td><input type="text" id="FirstName{{.Cid}}" maxlength="100" value="{{.FirstName}}" onfocusout="UpdateValue('FirstName',{{.Cid}})"></td>
+        <td><input type="text" id="LastName{{.Cid}}" maxlength="100" value="{{.LastName}}" onfocusout="UpdateValue('LastName',{{.Cid}})"></td>
+        <td><input type="text" id="BirthDate{{.Cid}}" maxlength="0" value="{{.BirthDate}}" onfocusout="UpdateValue('BirthDate',{{.Cid}})"></td>
+        <td><input type="text" id="Gender{{.Cid}}" maxlength="6" value="{{.Gender}}" onfocusout="UpdateValue('Gender',{{.Cid}})"></td>
+        <td><input type="text" id="Email{{.Cid}}" maxlength="100" value="{{.Email}}" onfocusout="UpdateValue('Email',{{.Cid}})"></td>
+        <td><input type="text" id="Address{{.Cid}}" maxlength="200" value="{{.Address}}" onfocusout="UpdateValue('Address',{{.Cid}})"></td>
+        <td><div id="LastUpdate{{.Cid}}">{{.LastUpdate}}</div></td>
+    </tr>
+    {{end}} {{else}}
+    <tr>
+        <td style="visibility:hidden;">-1</td>
+        <td colspan=7 align="center">No rows selected</td>
+    </tr>
+    {{end}}
+</tbody></table>
