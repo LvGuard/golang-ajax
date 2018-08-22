@@ -1,7 +1,7 @@
 # golang-ajax
 Simple Web App that allows to manage Customers table
 (Create-Read-Update)
-- GoLang with template/html
+- GoLang with html/template
 - PostgreSQL
 - Ajax-JSON
 - JQuery
