@@ -12,12 +12,12 @@
     {{ if .Customers}} {{range .Customers}}
     <tr>
         <td style="visibility:hidden;">{{.Cid}}</td>
-        <td><input type="text" id="FirstName{{.Cid}}" maxlength="100" value="{{.FirstName}}" onfocusout="UpdateValue('FirstName',{{.Cid}})"></td>
-        <td><input type="text" id="LastName{{.Cid}}" maxlength="100" value="{{.LastName}}" onfocusout="UpdateValue('LastName',{{.Cid}})"></td>
-        <td><input type="text" id="BirthDate{{.Cid}}" maxlength="0" value="{{.BirthDate}}" onfocusout="UpdateValue('BirthDate',{{.Cid}})"></td>
-        <td><input type="text" id="Gender{{.Cid}}" maxlength="6" value="{{.Gender}}" onfocusout="UpdateValue('Gender',{{.Cid}})"></td>
-        <td><input type="text" id="Email{{.Cid}}" maxlength="100" value="{{.Email}}" onfocusout="UpdateValue('Email',{{.Cid}})"></td>
-        <td><input type="text" id="Address{{.Cid}}" maxlength="200" value="{{.Address}}" onfocusout="UpdateValue('Address',{{.Cid}})"></td>
+        <td><input type="text" id="FirstName{{.Cid}}" maxlength="100" name="{{.FirstName}}" value="{{.FirstName}}" onchange="UpdateValue('FirstName',{{.Cid}})"></td>
+        <td><input type="text" id="LastName{{.Cid}}" maxlength="100" name="{{.LastName}}" value="{{.LastName}}" onchange="UpdateValue('LastName',{{.Cid}})"></td>
+        <td><input type="text" id="BirthDate{{.Cid}}" maxlength="0" name="{{.BirthDate}}" value="{{.BirthDate}}" onchange="UpdateValue('BirthDate',{{.Cid}})"></td>
+        <td><input type="text" id="Gender{{.Cid}}" maxlength="6" name="{{.Gender}}" value="{{.Gender}}" onchange="UpdateValue('Gender',{{.Cid}})"></td>
+        <td><input type="text" id="Email{{.Cid}}" maxlength="100" name="{{.Email}}" value="{{.Email}}" onchange="UpdateValue('Email',{{.Cid}})"></td>
+        <td><input type="text" id="Address{{.Cid}}" maxlength="200" name="{{.Address}}" value="{{.Address}}" onchange="UpdateValue('Address',{{.Cid}})"></td>
         <td><div id="LastUpdate{{.Cid}}">{{.LastUpdate}}</div></td>
     </tr>
     {{end}} {{else}}

@@ -43,8 +43,13 @@
 
         $("#SearchBy").on("keyup", function(e){
             if (e.keyCode == 13) {
+                $("#CurrentPage").text(1);
                 DisplayDataTable();
             }
+        });
+        $("#SearchBy").on("input", function(){
+            $("#CurrentPage").text(1);
+            DisplayDataTable();
         });
     });
     function DisplayDataTable() {
@@ -54,10 +59,12 @@
             contentType: 'application/json; charset=utf-8',
             data: JSON.stringify({ SearchBy: $("#SearchBy").val(),
                                    OrderByField: $("#OrderByField").val(),
-                                   OrderByDirection: $("#OrderByDirection").val() }),
+                                   OrderByDirection: $("#OrderByDirection").val(),
+                                   CurrentPage: $("#CurrentPage").text()-1 }),
             dataType: 'json',
             success: function(r) {
                 $('#DataTablePlaceholder').html(r.Data);
+                $('#PagesCount').text(r.PagesCount);
                  //activate datepicker for dinamically created input fields
                 var table = document.getElementById("DataTable");
                 for (var r = 1, row; row = table.rows[r]; r++) {
@@ -68,6 +75,7 @@
     };
     function UpdateValue(fieldToUpdate, cid) {
         document.getElementById(fieldToUpdate+cid).style.backgroundColor = "";
+        if (($("#"+fieldToUpdate+cid).val()) == ($('#'+fieldToUpdate+cid).attr('name'))) { return }
         $("#MessageError").text("");
         $("#MessageSuccess").text("");
         $.ajax({
@@ -77,15 +85,19 @@
             data: JSON.stringify({ Cid: cid,
                                    FieldToUpdate: fieldToUpdate,
                                    ValueToUpdate: $("#"+fieldToUpdate+cid).val(),
+                                   LastValue: $('#'+fieldToUpdate+cid).attr('name'),
                                    LastUpdate: $("#LastUpdate"+cid).text() }),
             dataType: 'json',
             success: function(r) {
                 $("#MessageError").text(r.ResponseError);
                 $("#MessageSuccess").text(r.ResponseSuccess);
-                $("#LastUpdate"+cid).text(r.LastUpdate);
-                if (r.ResponseError.length()>0) {
-                    $("#"+fieldToUpdate+cid).val(r.ValueToUpdate);
-                    alert(r.ResponseError);
+                if (r.ReloadFlag) {
+                    DisplayDataTable();
+                } else {
+                    $('#'+fieldToUpdate+cid).attr('name', r.LastValue);
+                    $("#LastUpdate"+cid).text(r.LastUpdate);
+                }
+                if (r.ResponseError.length>0) {
                     document.getElementById(fieldToUpdate+cid).style.backgroundColor = "orange";
                 }
             }
@@ -103,6 +115,35 @@
             $("#OrderByDirection").val("asc");
         }
         DisplayDataTable();
+    };
+    function ChangePage(a) {
+        switch (a) {
+            case 'first':
+                if ($("#CurrentPage").text() != "1") { 
+                    $("#CurrentPage").text(1);
+                    DisplayDataTable();
+                }
+                break;
+            case 'prev':
+                if ($("#CurrentPage").text() != "1") {
+                    $("#CurrentPage").text(($("#CurrentPage").text())-1);
+                    DisplayDataTable();
+                }
+                break;
+            case 'next':
+                if ($("#CurrentPage").text() != $("#PagesCount").text()) { 
+                    $("#CurrentPage").text(($("#CurrentPage").text())-1+2);
+                    DisplayDataTable();
+                }
+                break;
+            case 'last':
+                if ($("#CurrentPage").text() != $("#PagesCount").text()) { 
+                    $("#CurrentPage").text($("#PagesCount").text());
+                    DisplayDataTable();
+                }
+                break;
+        }
+        //DisplayDataTable();
     };
     </script>
 </head>
@@ -148,9 +189,20 @@
                 <td colspan=7>&nbsp;</td>
             </tr>
             <tr>
-                <td style="visibility:hidden;"><input type="text" id="OrderByField" maxlength="0" value="2"></td>
-                <td style="visibility:hidden;"><input type="text" id="OrderByDirection" maxlength="0" value="asc"></td>
-                <td colspan=5 align="right">Search: <input type="text" id="SearchBy" maxlength="100"></td>
+                <td colspan=2><table cellspacing=5><tbody><tr>
+                                  <td><a id="LinkFirst" href="" onclick="ChangePage('first');return false;">first</a></td>
+                                  <td><a id="LinkFirst" href="" onclick="ChangePage('prev');return false;">prev</a></td>
+                                  <td><div id="CurrentPage">1</div></td>
+                                  <td>(</td>
+                                  <td><div id="PagesCount">1</div></td>
+                                  <td>)</td>
+                                  <td><a id="LinkFirst" href="" onclick="ChangePage('next');return false;">next</a></td>
+                                  <td><a id="LinkFirst" href="" onclick="ChangePage('last');return false;">last</a></td>
+                              </tr></tbody></table>
+                </td>
+                <td style="visibility:hidden;"><input type="text" id="OrderByField" maxlength="0" value="2" size=1></td>
+                <td style="visibility:hidden;"><input type="text" id="OrderByDirection" maxlength="0" value="asc" size=1></td>
+                <td colspan=3 align="right">Search: <input type="text" id="SearchBy" maxlength="100"></td>
             </tr>
         </tbody></table>
     </p>
