@@ -33,9 +33,11 @@ type UpdateCustomer struct {
     Cid            int
     FieldToUpdate  string
     ValueToUpdate  string
+    LastValue      string
     LastUpdate     string
     ResponseError    string
     ResponseSuccess  string
+    ReloadFlag       bool
 }
 
 type Customer struct {
@@ -110,7 +112,31 @@ func DataTableHandler(w http.ResponseWriter, r *http.Request) {
     }
     //fmt.Printf("%v %v\n", context, context.PagesCount)
 
+    var recordsCount int;
+    var recordsPerPage int = 10;
+    var limitOffset string = fmt.Sprintf("limit %v offset %v", recordsPerPage, recordsPerPage*context.CurrentPage)
+    //fmt.Println(limitOffset)
     query := `
+        SELECT count(1) recordsCount
+          FROM Customers c
+         WHERE '%'||$1||'%' = ''
+            OR lower(c.FirstName)  like lower('%'||$1||'%')
+            OR lower(c.LastName)   like lower('%'||$1||'%')
+            OR to_char(c.BirthDate,'YYYY-MM-DD') like '%'||$1||'%'
+            OR lower(c.Gender)     like lower('%'||$1||'%')
+            OR lower(c.Email)      like lower('%'||$1||'%')
+            OR lower(c.Address)    like lower('%'||$1||'%')
+        ;`
+    rows, err := db.Query(query, context.SearchBy)
+    CheckErr(err)
+    for rows.Next() {
+        err = rows.Scan(&recordsCount)
+        CheckErr(err)
+    }
+    context.PagesCount = (recordsCount / recordsPerPage) + 1
+    //fmt.Println("PagesCount: ",context.PagesCount,"CurrentPage: ", context.CurrentPage, "Records per page: ",recordsPerPage)
+
+    query = `
         SELECT c.Cid, c.FirstName, c.LastName, to_char(c.BirthDate,'YYYY-MM-DD') BirthDate, c.Gender, c.Email, COALESCE(c.Address,''), c.LastUpdate
           FROM public.customers c
          WHERE '%'||$1||'%' = ''
@@ -120,9 +146,11 @@ func DataTableHandler(w http.ResponseWriter, r *http.Request) {
             OR lower(c.Gender)     like lower('%'||$1||'%')
             OR lower(c.Email)      like lower('%'||$1||'%')
             OR lower(c.Address)    like lower('%'||$1||'%')
-         ORDER BY ` + SanitizeOrderByField(context.OrderByField) + ` ` + SanitizeOrderByDirection(context.OrderByDirection) + `;`
+         ORDER BY ` + SanitizeOrderByField(context.OrderByField) + ` ` + SanitizeOrderByDirection(context.OrderByDirection) + `
+        ` + limitOffset + `
+        ;`
     //fmt.Println(query);
-    rows, err := db.Query(query, context.SearchBy)
+    rows, err = db.Query(query, context.SearchBy)
     CheckErr(err)
     var dataTable DataTable
     for rows.Next() {
@@ -156,7 +184,6 @@ func DataTableHandler(w http.ResponseWriter, r *http.Request) {
         http.Error(w, err.Error(), http.StatusInternalServerError)
     }
     context.Data = tpl.String()
-    context.PagesCount = 2
 
     // create json response from struct
     a, err := json.Marshal(context)
@@ -239,7 +266,7 @@ func IsValidEmail(t string) (bool, string, string) {
     if (len(t)>100) {
         return false, "Email maximal supported length is 100", ""
     }
-    if m, _ := regexp.MatchString(`^([\w\.\_]{2,10})@(\w{1,}).([a-z]{2,4})$`, t); !m {
+    if m, _ := regexp.MatchString(`^([\w\.\_]{2,30})@(\w{1,})\.([a-z]{2,4})$`, t); !m {
         return false, "Please provide valid Email", ""
     }
     return true, "", ""
@@ -316,78 +343,58 @@ func InsertProcess(c Customer) (bool, string, string) {
         fmt.Println("InsertProcess psql err: " + err.Error())
         return false, "psql err: " + err.Error(), ""
     }
-    fmt.Println("InsertProcess added record with cid =", cid)
+    //fmt.Println("InsertProcess added record with cid =", cid)
     return true, "", "New record successfully added"
 }
 
-func UpdateProcess(uc UpdateCustomer) (bool, string, string, string, string) {
-    query := `
-        SELECT c.` + uc.FieldToUpdate + ` OriginalValue
-             , c.LastUpdate
-          FROM Customers c
-         WHERE c.cid = $1;`
-    rows, err := db.Query(query, uc.Cid)
-    if err != nil {
-        return false, "psql err1: " + err.Error(), "", uc.ValueToUpdate, uc.LastUpdate
-    }
-    var originalValue, lastUpdate string
-    for rows.Next() {
-        err = rows.Scan(&originalValue, &lastUpdate)
-        if err != nil {
-            return false, "psql err2: " + err.Error(), "", uc.ValueToUpdate, uc.LastUpdate
-        }
-    }
-    fmt.Println("OriginalValue:",originalValue,"-",uc.ValueToUpdate,":ValueToUpdate")
-    if (originalValue == uc.ValueToUpdate) {
-        return true, "", "", originalValue, lastUpdate
-    }
-
-    if (lastUpdate != uc.LastUpdate) {
-        return false, "Warning: Value changed by another user session, please verify new value and update if necessary!", "", originalValue, lastUpdate
-    }
-
-    query = `UPDATE Customers
-                SET ` + uc.FieldToUpdate + ` = $1
-                  , LastUpdate = NOW()
-              WHERE cid = $2
-                AND lastUpdate = $3;`
-    fmt.Println("Update query:", query)
+func UpdateProcess(uc UpdateCustomer) (bool, string, string, string, string, bool) {
+    query := `UPDATE Customers
+                 SET ` + uc.FieldToUpdate + ` = $1
+                   , LastUpdate = NOW()
+               WHERE cid = $2
+                 AND ` + uc.FieldToUpdate + ` = $3
+                 AND lastUpdate = $4;`
     stmt, err := db.Prepare(query)
     if err != nil {
-        return false, "psql err3: " + err.Error(), "", uc.ValueToUpdate, uc.LastUpdate
+        return false, "psql err1: " + err.Error(), "", uc.LastValue, uc.LastUpdate, false
     }
-
-    res, err := stmt.Exec(uc.ValueToUpdate, uc.Cid, uc.LastUpdate)
+    res, err := stmt.Exec(uc.ValueToUpdate, uc.Cid, uc.LastValue, uc.LastUpdate) // also checking LastValue in case value was changed in DB manually without updating LastUpdate
     if err != nil {
-        return false, "psql err4: " + err.Error(), "", uc.ValueToUpdate, uc.LastUpdate
+        return false, "psql err2: " + err.Error(), "", uc.LastValue, uc.LastUpdate, false
     }
 
     rowsAffected, err := res.RowsAffected()
     if err != nil {
-        return false, "psql err5: " + err.Error(), "", uc.ValueToUpdate, uc.LastUpdate
+        return false, "psql err3: " + err.Error(), "", uc.LastValue, uc.LastUpdate, true
     }
-    fmt.Println(rowsAffected, "rows affected")
+    //fmt.Println(rowsAffected, "rows affected")
 
+    var dbLastValue, dbLastUpdate string
+    tmpSelect := uc.FieldToUpdate
+    if (uc.FieldToUpdate == "BirthDate") {tmpSelect = "to_char(BirthDate,'YYYY-MM-DD')"}
     query = `
-        SELECT c.` + uc.FieldToUpdate + ` OriginalValue
-             , c.LastUpdate
-          FROM Customers c
-         WHERE c.cid = $1;`
-    rows, err = db.Query(query, uc.Cid)
+        SELECT ` + tmpSelect + ` dbLastValue
+             , LastUpdate dbLastUpdate
+          FROM Customers
+         WHERE cid = $1;`
+    rows, err := db.Query(query, uc.Cid)
     if err != nil {
-        return false, "psql err6: " + err.Error(), "", uc.ValueToUpdate, uc.LastUpdate
+        return false, "psql err4: " + err.Error(), "", uc.LastValue, uc.LastUpdate, true
     }
     for rows.Next() {
-        err = rows.Scan(&originalValue, &lastUpdate)
+        err = rows.Scan(&dbLastValue, &dbLastUpdate)
         if err != nil {
-            return false, "psql err7: " + err.Error(), "", uc.ValueToUpdate, uc.LastUpdate
+            return false, "psql err5: " + err.Error(), "", uc.LastValue, uc.LastUpdate, true
         }
     }
-    
+
     if (rowsAffected!=1) {
-        return false, "Warning: Value changed by another user session, please verify new value and update if necessary!", "", originalValue, lastUpdate
+        if (dbLastValue!=uc.ValueToUpdate) {
+            return false, "Value changed by another user session, please verify new value and update it if necessary, page reloaded", "", dbLastValue, dbLastUpdate, true
+        }
+        return true, "", "Value already updated to  '" + dbLastValue + "' by another user session, page reloaded", dbLastValue, dbLastUpdate, true
     } 
-    return true, "", "1 record updated at " + lastUpdate, originalValue, lastUpdate
+    return true, "", "'" + uc.LastValue + "' updated to '" + dbLastValue + "' at " + dbLastUpdate, dbLastValue, dbLastUpdate, false
 }
 
 func InsertHandler(w http.ResponseWriter, r *http.Request) {
@@ -420,14 +427,14 @@ func UpdateHandler(w http.ResponseWriter, r *http.Request) {
         http.Error(w, err.Error(), http.StatusInternalServerError)
     }
     
-    fmt.Println("Update - input",uc.Cid,uc.FieldToUpdate,uc.ValueToUpdate,uc.LastUpdate,uc.ResponseError,uc.ResponseSuccess)
+    //fmt.Println("Update - input",uc.Cid,uc.FieldToUpdate,uc.ValueToUpdate,uc.LastValue,uc.LastUpdate,uc.ResponseError,uc.ResponseSuccess,uc.ReloadFlag)
     var res bool
     res, uc.ResponseError, uc.ResponseSuccess = UpdateValidate(uc)
     if (res) {
-        res, uc.ResponseError, uc.ResponseSuccess, uc.ValueToUpdate, uc.LastUpdate = UpdateProcess(uc)
+        res, uc.ResponseError, uc.ResponseSuccess, uc.LastValue, uc.LastUpdate, uc.ReloadFlag = UpdateProcess(uc)
     }
 
-    fmt.Println("Update - output",uc.Cid,uc.FieldToUpdate,uc.ValueToUpdate,uc.LastUpdate,uc.ResponseError,uc.ResponseSuccess)
+    //fmt.Println("Update - output",uc.Cid,uc.FieldToUpdate,uc.ValueToUpdate,uc.LastValue,uc.LastUpdate,uc.ResponseError,uc.ResponseSuccess,uc.ReloadFlag)
     // create json response from struct
     a, err := json.Marshal(uc)
     if err != nil {
