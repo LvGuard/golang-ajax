@@ -86,7 +86,7 @@ func (c Customer) IsSelectedGender(gender string) bool {
 }
 
 type DataTable struct {
-    Customers      []Customer
+    Customers    []Customer
     Language     string
 }
 func (dt DataTable) LNG(lid string) string {
@@ -161,15 +161,9 @@ func SanitizeOrderByDirection(orderByDirection string) string {
     return "asc"
 }
 
-func DataTableHandler(w http.ResponseWriter, r *http.Request) {
-    var context Context
-    err := json.NewDecoder(r.Body).Decode(&context)
-    if err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
-    }
-
-    var recordsCount int;
-    var recordsPerPage int = 10;
+func DataTableLoad(context *Context, dataTable *DataTable) {
+    var recordsCount int
+    var recordsPerPage int = 10
     var limitOffset string = fmt.Sprintf("limit %v offset %v", recordsPerPage, recordsPerPage*context.CurrentPage)
     //fmt.Println(limitOffset)
     query := `
@@ -208,7 +202,6 @@ func DataTableHandler(w http.ResponseWriter, r *http.Request) {
     //fmt.Println(query);
     rows, err = db.Query(query, context.SearchBy)
     CheckErr(err)
-    var dataTable DataTable
     dataTable.Language = SanitizeLng(context.Language)
     for rows.Next() {
         //var created time.Time
@@ -228,6 +221,17 @@ func DataTableHandler(w http.ResponseWriter, r *http.Request) {
             LastUpdate:  lastUpdate,
         })
     }
+}
+
+func DataTableHandler(w http.ResponseWriter, r *http.Request) {
+    var context Context
+    err := json.NewDecoder(r.Body).Decode(&context)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+    }
+
+    var dataTable DataTable
+    DataTableLoad(&context, &dataTable)
 
     fp := path.Join("templates", "DataTable.html")
     tmpl, err := template.ParseFiles(fp)
@@ -337,35 +341,34 @@ func IsValidAddress(t string, language string) (bool, string, string) {
 }
 
 
-func InsertValidate(c Customer, language string) (bool, string, string) {
+func InsertValidate(c *Customer, language string) bool {
     //All checks done here, as Javascript on client side could be easily disabled
     var r bool
-    var r_err, r_ok string
     //FirstName
-    if r, r_err, r_ok = IsValidFirstName(c.FirstName, language); !r {
-        return false, r_err, r_ok
+    if r, c.ResponseError, c.ResponseSuccess = IsValidFirstName(c.FirstName, language); !r {
+        return false
     }
     //LastName
-    if r, r_err, r_ok = IsValidLastName(c.LastName, language); !r {
-        return false, r_err, r_ok
+    if r, c.ResponseError, c.ResponseSuccess = IsValidLastName(c.LastName, language); !r {
+        return false
     }
     //BirthDate
-    if r, r_err, r_ok = IsValidBirthDate(c.BirthDate, language); !r {
-        return false, r_err, r_ok
+    if r, c.ResponseError, c.ResponseSuccess = IsValidBirthDate(c.BirthDate, language); !r {
+        return false
     }
     //Gender
-    if r, r_err, r_ok = IsValidGender(c.Gender, language); !r {
-        return false, r_err, r_ok
+    if r, c.ResponseError, c.ResponseSuccess = IsValidGender(c.Gender, language); !r {
+        return false
     }
     //Email
-    if r, r_err, r_ok = IsValidEmail(c.Email, language); !r {
-        return false, r_err, r_ok
+    if r, c.ResponseError, c.ResponseSuccess = IsValidEmail(c.Email, language); !r {
+        return false
     }
     //Address
-    if r, r_err, r_ok = IsValidAddress(c.Address, language); !r {
-        return false, r_err, r_ok
+    if r, c.ResponseError, c.ResponseSuccess = IsValidAddress(c.Address, language); !r {
+        return false
     }
-    return true, "", ""
+    return true
 }
 
 func UpdateValidate(uc UpdateCustomer, language string) (bool, string, string) {
@@ -387,21 +390,22 @@ func UpdateValidate(uc UpdateCustomer, language string) (bool, string, string) {
     return false, GetLngData("INVALID_OPERATION_PLEASE_RELOAD", language), ""
 }
 
-func InsertProcess(c Customer, language string) (bool, string, string) {
-    var cid int
+func InsertProcess(c *Customer, language string) bool {
     query := `
         INSERT INTO Customers
         (FirstName, LastName, BirthDate, Gender, Email, Address, LastUpdate)
         VALUES
         ($1, $2, $3, $4, $5, $6, NOW() )
         returning cid;`
-    err := db.QueryRow(query, c.FirstName, c.LastName, c.BirthDate, c.Gender, c.Email, c.Address).Scan(&cid)
+    err := db.QueryRow(query, c.FirstName, c.LastName, c.BirthDate, c.Gender, c.Email, c.Address).Scan(&c.Cid)
     if err != nil {
-        fmt.Println("InsertProcess psql err: " + err.Error())
-        return false, "psql err: " + err.Error(), ""
+        c.ResponseError = "psql ins1: " + err.Error()
+        fmt.Println(c.ResponseError)
+        return false
     }
-    //fmt.Println("InsertProcess added record with cid =", cid)
-    return true, "", GetLngData("NEW_RECORD_SUCCESSFULLY_ADDED", language)
+    //fmt.Println("InsertProcess added record with cid =", c.Cid)
+    c.ResponseSuccess = GetLngData("NEW_RECORD_SUCCESSFULLY_ADDED", language)
+    return true
 }
 
 func UpdateProcess(uc UpdateCustomer, language string) (bool, string, string, string, string, bool) {
@@ -465,9 +469,9 @@ func InsertHandler(w http.ResponseWriter, r *http.Request) {
     }
     
     var res bool
-    res, c.ResponseError, c.ResponseSuccess = InsertValidate(c, language)
+    res = InsertValidate(&c, language)
     if (res) {
-        res, c.ResponseError, c.ResponseSuccess = InsertProcess(c, language)
+        res = InsertProcess(&c, language)
     }
 
     // create json response from struct
@@ -504,25 +508,40 @@ func UpdateHandler(w http.ResponseWriter, r *http.Request) {
     w.Write(a)
 }
 
+func DeleteProcess(cid int) (bool, string) {
+    stmt, err := db.Prepare("delete from Customers where cid=$1")
+    if err != nil { return false, err.Error() }
 
-func main() {
-    fmt.Printf("Start\n")
+    res, err := stmt.Exec(cid)
+    if err != nil { return false, err.Error() }
 
+    deletedRows, err := res.RowsAffected()
+    if err != nil { return false, err.Error() }
+
+    if deletedRows != 1 { return false, fmt.Sprintf("deletedRows(%v) != 1",deletedRows) }
+
+    return true, ""
+}
+
+func InitDb() {
     fmt.Printf("Connecting\n")
     var err error
     dbinfo := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=disable", DB_USER, DB_PASSWORD, DB_NAME)
     db, err = sql.Open("postgres", dbinfo)
     CheckErr(err)
-    defer db.Close()
+}
+
+func main() {
+    fmt.Printf("Start\n")
+    InitDb()
 
     fmt.Printf("HTTP handler startup\n")
-
     http.HandleFunc("/", DefaultHandler)
     http.HandleFunc("/DataTable", DataTableHandler)
     http.HandleFunc("/Insert", InsertHandler)
     http.HandleFunc("/Update", UpdateHandler)
     http.ListenAndServe(":8080", nil)
 
+    defer db.Close()
     fmt.Printf("End\n")
-
 }
