@@ -3,6 +3,7 @@ package main
 import (
     "fmt"
     "net/http"
+    "net/url"
     "html/template"
     "database/sql"
     _ "github.com/lib/pq"
@@ -25,8 +26,36 @@ func CheckErr(err error) {
     }
 }
 
+func GetLngData(lid string, language string) string {
+    var lngValue string
+    query := `
+        SELECT COALESCE(Language_` + language + `,'LNG_'||lid) LngValue
+          FROM LngData
+         WHERE lid = $1;`
+    rows, err := db.Query(query, lid)
+    if err != nil {
+        fmt.Println("ERROR: psql lng1: ",err.Error());
+        return "LNG_"+lid
+    }
+    for rows.Next() {
+        err = rows.Scan(&lngValue)
+        if err != nil {
+            fmt.Println("ERROR: psql lng2: ",err.Error());
+            return "LNG_"+lid
+        }
+    }
+    if (lngValue == "") {
+        fmt.Println("ERROR: ",lid,"not found in LngData table for Language",language);
+        return "LNG_"+lid
+    }
+    return lngValue
+}
+
 type LNG_DATA struct {
-    LNG_GREETINGS string
+    Language string
+}
+func (l LNG_DATA) LNG(lid string) string {
+    return GetLngData(lid, l.Language)
 }
 
 type UpdateCustomer struct {
@@ -52,8 +81,16 @@ type Customer struct {
     ResponseError    string
     ResponseSuccess  string
 }
+func (c Customer) IsSelectedGender(gender string) bool {
+    return (gender == c.Gender)
+}
+
 type DataTable struct {
     Customers      []Customer
+    Language     string
+}
+func (dt DataTable) LNG(lid string) string {
+    return GetLngData(lid, dt.Language)
 }
 
 type Context struct {
@@ -63,12 +100,32 @@ type Context struct {
     PagesCount   int
     CurrentPage  int
     Data         string
+    Language     string
 }
 
+func SanitizeLng(lng string) string {
+    switch lng {
+    case
+        "2",
+        "3":
+        return lng
+    }
+    return "1"
+}
+func GetLng(r_url string) string {
+    m, _ := url.ParseQuery(r_url)
+    var lng string
+    if _, ok := m["lng"]; ok {
+        lng=m["lng"][0]
+    }
+    return SanitizeLng(lng)
+}
 
 func DefaultHandler(w http.ResponseWriter, r *http.Request) {
-    lngData := LNG_DATA{"Welcome to cutomer portal!"}
-    
+    if (r.URL.Path != "/") { return }
+
+    lngData := LNG_DATA{GetLng(r.URL.RawQuery)}
+
     fp := path.Join("templates", "MainPage.html")
     tmpl, err := template.ParseFiles(fp)
     if err != nil {
@@ -110,7 +167,6 @@ func DataTableHandler(w http.ResponseWriter, r *http.Request) {
     if err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
     }
-    //fmt.Printf("%v %v\n", context, context.PagesCount)
 
     var recordsCount int;
     var recordsPerPage int = 10;
@@ -153,6 +209,7 @@ func DataTableHandler(w http.ResponseWriter, r *http.Request) {
     rows, err = db.Query(query, context.SearchBy)
     CheckErr(err)
     var dataTable DataTable
+    dataTable.Language = SanitizeLng(context.Language)
     for rows.Next() {
         //var created time.Time
         var cid int
@@ -194,9 +251,9 @@ func DataTableHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 
-func IsValidFirstName(t string) (bool, string, string) {
+func IsValidFirstName(t string, language string) (bool, string, string) {
     if (len(t)==0) {
-        return false, "Mandatory(*) fields cannot be empty", ""
+        return false, GetLngData("MANDATORY_FIELDS_CANNOT_BE_EMPTY", language), ""
     }
     if (len(t)>100) {
         return false, "First Name maximal supported length is 100", ""
@@ -204,9 +261,9 @@ func IsValidFirstName(t string) (bool, string, string) {
     return true, "", ""
 }
 
-func IsValidLastName(t string) (bool, string, string) {
+func IsValidLastName(t string, language string) (bool, string, string) {
     if (len(t)==0) {
-        return false, "Mandatory(*) fields cannot be empty", ""
+        return false, GetLngData("MANDATORY_FIELDS_CANNOT_BE_EMPTY", language), ""
     }
     if (len(t)>100) {
         return false, "Last Name maximal supported length is 100", ""
@@ -214,15 +271,15 @@ func IsValidLastName(t string) (bool, string, string) {
     return true, "", ""
 }
 
-func IsValidBirthDate(t string) (bool, string, string) {
+func IsValidBirthDate(t string, language string) (bool, string, string) {
     if (len(t)==0) {
-        return false, "Mandatory(*) fields cannot be empty", ""
+        return false, GetLngData("MANDATORY_FIELDS_CANNOT_BE_EMPTY", language), ""
     }
     if (len(t)!=10) {
-        return false, "Please provide valid Birth Date", ""
+        return false, GetLngData("PLEASE_PROVIDE_VALID_BIRTH_DATE", language), ""
     }
     if m, _ := regexp.MatchString("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", t); !m {
-        return false, "Please provide valid Birth Date in format YYYY-MM-DD", ""
+        return false, GetLngData("PLEASE_PROVIDE_VALID_BIRTH_DATE_IN_FORMAT", language), ""
     }
     //between 18 and 60 years old
     query := `
@@ -231,24 +288,24 @@ func IsValidBirthDate(t string) (bool, string, string) {
         DateCheck;`
     rows, err := db.Query(query, t)
     if err != nil {
-        return false, "Please provide valid Birth Date in format YYYY-MM-DD", ""
+        return false, GetLngData("PLEASE_PROVIDE_VALID_BIRTH_DATE_IN_FORMAT", language), ""
     }
     var dateCheck string
     for rows.Next() {
         err = rows.Scan(&dateCheck)
         if err != nil {
-            return false, "Please provide valid Birth Date in format YYYY-MM-DD", ""
+            return false, GetLngData("PLEASE_PROVIDE_VALID_BIRTH_DATE_IN_FORMAT", language), ""
         }
     }
     if (dateCheck == "false") {
-        return false, "Please provide valid Birth Date from 18 till 60 years", ""
+        return false, GetLngData("PLEASE_PROVIDE_VALID_BIRTH_DATE_FROM_TO", language), ""
     }
     return true, "", ""
 }
 
-func IsValidGender(t string) (bool, string, string) {
+func IsValidGender(t string, language string) (bool, string, string) {
     if (len(t)==0) {
-        return false, "Mandatory(*) fields cannot be empty", ""
+        return false, GetLngData("MANDATORY_FIELDS_CANNOT_BE_EMPTY", language), ""
     }
     switch t {
     case
@@ -256,23 +313,23 @@ func IsValidGender(t string) (bool, string, string) {
         "Female":
         return true, "", ""
     }
-    return false, "Gender field supports only Male and Female values", ""
+    return false, GetLngData("GENDER_FIELDS_SUPPORTS_ONLY_VALUES", language), ""
 }
 
-func IsValidEmail(t string) (bool, string, string) {
+func IsValidEmail(t string, language string) (bool, string, string) {
     if (len(t)==0) {
-        return false, "Mandatory(*) fields cannot be empty", ""
+        return false, GetLngData("MANDATORY_FIELDS_CANNOT_BE_EMPTY", language), ""
     }
     if (len(t)>100) {
         return false, "Email maximal supported length is 100", ""
     }
     if m, _ := regexp.MatchString(`^([\w\.\_]{2,30})@(\w{1,})\.([a-z]{2,4})$`, t); !m {
-        return false, "Please provide valid Email", ""
+        return false, GetLngData("PLEASE_PROVIDE_VALID_EMAIL", language), ""
     }
     return true, "", ""
 }
 
-func IsValidAddress(t string) (bool, string, string) {
+func IsValidAddress(t string, language string) (bool, string, string) {
     if (len(t)>200) {
         return false, "Address maximal supported length is 200", ""
     }
@@ -280,57 +337,57 @@ func IsValidAddress(t string) (bool, string, string) {
 }
 
 
-func InsertValidate(c Customer) (bool, string, string) {
+func InsertValidate(c Customer, language string) (bool, string, string) {
     //All checks done here, as Javascript on client side could be easily disabled
     var r bool
     var r_err, r_ok string
     //FirstName
-    if r, r_err, r_ok = IsValidFirstName(c.FirstName); !r {
+    if r, r_err, r_ok = IsValidFirstName(c.FirstName, language); !r {
         return false, r_err, r_ok
     }
     //LastName
-    if r, r_err, r_ok = IsValidLastName(c.LastName); !r {
+    if r, r_err, r_ok = IsValidLastName(c.LastName, language); !r {
         return false, r_err, r_ok
     }
     //BirthDate
-    if r, r_err, r_ok = IsValidBirthDate(c.BirthDate); !r {
+    if r, r_err, r_ok = IsValidBirthDate(c.BirthDate, language); !r {
         return false, r_err, r_ok
     }
     //Gender
-    if r, r_err, r_ok = IsValidGender(c.Gender); !r {
+    if r, r_err, r_ok = IsValidGender(c.Gender, language); !r {
         return false, r_err, r_ok
     }
     //Email
-    if r, r_err, r_ok = IsValidEmail(c.Email); !r {
+    if r, r_err, r_ok = IsValidEmail(c.Email, language); !r {
         return false, r_err, r_ok
     }
     //Address
-    if r, r_err, r_ok = IsValidAddress(c.Address); !r {
+    if r, r_err, r_ok = IsValidAddress(c.Address, language); !r {
         return false, r_err, r_ok
     }
     return true, "", ""
 }
 
-func UpdateValidate(uc UpdateCustomer) (bool, string, string) {
+func UpdateValidate(uc UpdateCustomer, language string) (bool, string, string) {
     //All checks done here, as Javascript on client side could be easily disabled
     switch uc.FieldToUpdate {
     case "FirstName":
-        return IsValidFirstName(uc.ValueToUpdate)
+        return IsValidFirstName(uc.ValueToUpdate, language)
     case "LastName":
-        return IsValidLastName(uc.ValueToUpdate)
+        return IsValidLastName(uc.ValueToUpdate, language)
     case "BirthDate":
-        return IsValidBirthDate(uc.ValueToUpdate)
+        return IsValidBirthDate(uc.ValueToUpdate, language)
     case "Gender":
-        return IsValidGender(uc.ValueToUpdate)
+        return IsValidGender(uc.ValueToUpdate, language)
     case"Email":
-        return IsValidEmail(uc.ValueToUpdate)
+        return IsValidEmail(uc.ValueToUpdate, language)
     case "Address":
-        return IsValidAddress(uc.ValueToUpdate)
+        return IsValidAddress(uc.ValueToUpdate, language)
     }
-    return false, "Invalid operation, please re-load the page", ""
+    return false, GetLngData("INVALID_OPERATION_PLEASE_RELOAD", language), ""
 }
 
-func InsertProcess(c Customer) (bool, string, string) {
+func InsertProcess(c Customer, language string) (bool, string, string) {
     var cid int
     query := `
         INSERT INTO Customers
@@ -344,10 +401,10 @@ func InsertProcess(c Customer) (bool, string, string) {
         return false, "psql err: " + err.Error(), ""
     }
     //fmt.Println("InsertProcess added record with cid =", cid)
-    return true, "", "New record successfully added"
+    return true, "", GetLngData("NEW_RECORD_SUCCESSFULLY_ADDED", language)
 }
 
-func UpdateProcess(uc UpdateCustomer) (bool, string, string, string, string, bool) {
+func UpdateProcess(uc UpdateCustomer, language string) (bool, string, string, string, string, bool) {
     query := `UPDATE Customers
                  SET ` + uc.FieldToUpdate + ` = $1
                    , LastUpdate = NOW()
@@ -390,14 +447,16 @@ func UpdateProcess(uc UpdateCustomer) (bool, string, string, string, string, boo
 
     if (rowsAffected!=1) {
         if (dbLastValue!=uc.ValueToUpdate) {
-            return false, "Value changed by another user session, please verify new value and update it if necessary, page reloaded", "", dbLastValue, dbLastUpdate, true
+            return false, GetLngData("VALUE_CHANGED_BY_ANOTHER_USER_RELOADED", language), "", dbLastValue, dbLastUpdate, true
         }
-        return true, "", "Value already updated to  '" + dbLastValue + "' by another user session, page reloaded", dbLastValue, dbLastUpdate, true
+        return true, "", GetLngData("VALUE_ALREADY_UPDATED_BY_ANOTHER_USER_RELOADED", language)+dbLastValue, dbLastValue, dbLastUpdate, true
     } 
-    return true, "", "'" + uc.LastValue + "' updated to '" + dbLastValue + "' at " + dbLastUpdate, dbLastValue, dbLastUpdate, false
+    return true, "", GetLngData("UPDATED_SUCCESSFULLY_OLD_VALUE", language)+uc.LastValue+GetLngData("NEW_VALUE", language)+dbLastValue+"\"", dbLastValue, dbLastUpdate, false
 }
 
 func InsertHandler(w http.ResponseWriter, r *http.Request) {
+    language := GetLng(r.URL.RawQuery)
+
     //parse request to struct
     var c Customer
     err := json.NewDecoder(r.Body).Decode(&c)
@@ -406,9 +465,9 @@ func InsertHandler(w http.ResponseWriter, r *http.Request) {
     }
     
     var res bool
-    res, c.ResponseError, c.ResponseSuccess = InsertValidate(c)
+    res, c.ResponseError, c.ResponseSuccess = InsertValidate(c, language)
     if (res) {
-        res, c.ResponseError, c.ResponseSuccess = InsertProcess(c)
+        res, c.ResponseError, c.ResponseSuccess = InsertProcess(c, language)
     }
 
     // create json response from struct
@@ -420,6 +479,8 @@ func InsertHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdateHandler(w http.ResponseWriter, r *http.Request) {
+    language := GetLng(r.URL.RawQuery)
+
     //parse request to struct
     var uc UpdateCustomer
     err := json.NewDecoder(r.Body).Decode(&uc)
@@ -429,9 +490,9 @@ func UpdateHandler(w http.ResponseWriter, r *http.Request) {
     
     //fmt.Println("Update - input",uc.Cid,uc.FieldToUpdate,uc.ValueToUpdate,uc.LastValue,uc.LastUpdate,uc.ResponseError,uc.ResponseSuccess,uc.ReloadFlag)
     var res bool
-    res, uc.ResponseError, uc.ResponseSuccess = UpdateValidate(uc)
+    res, uc.ResponseError, uc.ResponseSuccess = UpdateValidate(uc, language)
     if (res) {
-        res, uc.ResponseError, uc.ResponseSuccess, uc.LastValue, uc.LastUpdate, uc.ReloadFlag = UpdateProcess(uc)
+        res, uc.ResponseError, uc.ResponseSuccess, uc.LastValue, uc.LastUpdate, uc.ReloadFlag = UpdateProcess(uc, language)
     }
 
     //fmt.Println("Update - output",uc.Cid,uc.FieldToUpdate,uc.ValueToUpdate,uc.LastValue,uc.LastUpdate,uc.ResponseError,uc.ResponseSuccess,uc.ReloadFlag)
