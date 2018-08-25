@@ -28,3 +28,5 @@ INSERT INTO lngdata (lid, language_1, language_2, language_3) VALUES ('VALUE_CHA
 INSERT INTO lngdata (lid, language_1, language_2, language_3) VALUES ('VALUE_ALREADY_UPDATED_BY_ANOTHER_USER_RELOADED', 'Value already updated by another user session, page reloaded, actual value: ', 'Значение уже обновлено другим пользователем, страница обновлена, актуальное значение: ', '');
 INSERT INTO lngdata (lid, language_1, language_2, language_3) VALUES ('UPDATED_SUCCESSFULLY_OLD_VALUE', 'Updated successfully, old value: "', 'Успешно обновлено, старое значение: "', '');
 INSERT INTO lngdata (lid, language_1, language_2, language_3) VALUES ('NEW_VALUE', '", new value: "', '", новое значение: "', '');
+
+INSERT INTO lngdata (lid, language_1, language_2, language_3) VALUES ('SUCH_COMBINATION_ALREADY_EXISTS', 'Warning: Such combination of First Name, Last Name and Birth Date already exists', 'Внимание: Такая комбинация Имени, Фамилии и Даты рождения уже введена в систему', '');
