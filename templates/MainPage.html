@@ -14,11 +14,11 @@
         $("#InsertButton").click(function(){
             $("#MessageError").text("");
             $("#MessageSuccess").text("");
-            if( (!$("#InsertFirstName").val())||(!$("#InsertLastName").val())||(!$("#InsertBirthDate").val())||(!$("#InsertGender").val())||(!$("#InsertEmail").val()) ){
-                $("#MessageError").text("Please fill all mandatory(*) fields");
-            } else {
+            //if( (!$("#InsertFirstName").val())||(!$("#InsertLastName").val())||(!$("#InsertBirthDate").val())||(!$("#InsertGender").val())||(!$("#InsertEmail").val()) ){
+            //    $("#MessageError").text("Please fill all mandatory(*) fields");
+            //} else {
                 $.ajax({
-                    url: '/Insert',
+                    url: '/Insert?lng='+$("#Language").val(),
                     type: "post",
                     contentType: 'application/json; charset=utf-8',
                     data: JSON.stringify({ FirstName: $("#InsertFirstName").val(),
@@ -36,7 +36,7 @@
                         }
                     }
                 });
-            }
+            //}
         });
 
         $("#InsertBirthDate").datepicker({ dateFormat: "yy-mm-dd" }).val();
@@ -60,7 +60,8 @@
             data: JSON.stringify({ SearchBy: $("#SearchBy").val(),
                                    OrderByField: $("#OrderByField").val(),
                                    OrderByDirection: $("#OrderByDirection").val(),
-                                   CurrentPage: $("#CurrentPage").text()-1 }),
+                                   CurrentPage: $("#CurrentPage").text()-1,
+                                   Language: $("#Language").val() }),
             dataType: 'json',
             success: function(r) {
                 $('#DataTablePlaceholder').html(r.Data);
@@ -79,7 +80,7 @@
         $("#MessageError").text("");
         $("#MessageSuccess").text("");
         $.ajax({
-            url: '/Update',
+            url: '/Update?lng='+$("#Language").val(),
             type: "post",
             contentType: 'application/json; charset=utf-8',
             data: JSON.stringify({ Cid: cid,
@@ -150,20 +151,20 @@
 
 <body>
     <div style="border-bottom-style: solid; background-color: powderblue;height: 80px;">
-        <h1 align="center">{{.LNG_GREETINGS}}</h1>
+        <h1 align="center">{{.LNG "GREETINGS"}}</h1>
         <div style="text-align:right;width: 80%">
-            EN  RU
+            <a id="Languge_1" href="?lng=1">EN</a>  <a id="Languge_2" href="?lng=2">RU</a>
         </div>
     </div>
     <p id="InsertTable" align="center">
         <table cellspacing=3><tbody>
             <tr>
-                <th>First Name*</th>
-                <th>Last Name*</th>
-                <th>Birth Date*</th>
-                <th>Gender*</th>
-                <th>Email*</th>
-                <th>Address</th>
+                <th>{{.LNG "FIRST_NAME"}}*</th>
+                <th>{{.LNG "LAST_NAME"}}*</th>
+                <th>{{.LNG "BIRTH_DATE"}}*</th>
+                <th>{{.LNG "GENDER"}}*</th>
+                <th>{{.LNG "EMAIL"}}*</th>
+                <th>{{.LNG "ADDRESS"}}</th>
                 <th></th>
             </tr>
             <tr>
@@ -171,13 +172,13 @@
                 <td><input type="text" id="InsertLastName" maxlength="100"></td>
                 <td><input type="text" id="InsertBirthDate" maxlength="10"></td>
                 <td><select id="InsertGender">
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
+                    <option value="Male">{{.LNG "GENDER_MALE"}}</option>
+                    <option value="Female">{{.LNG "GENDER_FEMALE"}}</option>
                     </select>
                 </td>
                 <td><input type="text" id="InsertEmail" maxlength="100"></td>
                 <td><input type="text" id="InsertAddress" maxlength="200"></td>
-                <td><button id="InsertButton">Add new</button></td>
+                <td><button id="InsertButton">{{.LNG "ADD_NEW"}}</button></td>
             </tr>
             <tr>
                 <td colspan=7><div id="MessageError" style="color: red"></div></td>
@@ -190,25 +191,35 @@
             </tr>
             <tr>
                 <td colspan=2><table cellspacing=5><tbody><tr>
-                                  <td><a id="LinkFirst" href="" onclick="ChangePage('first');return false;">first</a></td>
-                                  <td><a id="LinkFirst" href="" onclick="ChangePage('prev');return false;">prev</a></td>
+                                  <td><a id="LinkFirst" href="" onclick="ChangePage('first');return false;">{{.LNG "FIRST"}}</a></td>
+                                  <td><a id="LinkFirst" href="" onclick="ChangePage('prev');return false;">{{.LNG "PREV"}}</a></td>
                                   <td><div id="CurrentPage">1</div></td>
                                   <td>(</td>
                                   <td><div id="PagesCount">1</div></td>
                                   <td>)</td>
-                                  <td><a id="LinkFirst" href="" onclick="ChangePage('next');return false;">next</a></td>
-                                  <td><a id="LinkFirst" href="" onclick="ChangePage('last');return false;">last</a></td>
+                                  <td><a id="LinkFirst" href="" onclick="ChangePage('next');return false;">{{.LNG "NEXT"}}</a></td>
+                                  <td><a id="LinkFirst" href="" onclick="ChangePage('last');return false;">{{.LNG "LAST"}}</a></td>
                               </tr></tbody></table>
                 </td>
-                <td style="visibility:hidden;"><input type="text" id="OrderByField" maxlength="0" value="2" size=1></td>
-                <td style="visibility:hidden;"><input type="text" id="OrderByDirection" maxlength="0" value="asc" size=1></td>
-                <td colspan=3 align="right">Search: <input type="text" id="SearchBy" maxlength="100"></td>
+                <td colspan=2 style="visibility:hidden;">
+                    <input type="text" id="OrderByField" maxlength="0" value="2" size=1>
+                    <input type="text" id="OrderByDirection" maxlength="0" value="asc" size=1>
+                    <input type="text" id="Language" maxlength="0" value="{{.Language}}" size=1>
+                </td>
+                <td colspan=3 align="right">{{.LNG "SEARCH"}}: <input type="text" id="SearchBy" maxlength="100"></td>
             </tr>
         </tbody></table>
     </p>
 
     <p id="DataTablePlaceholder" align="center"></p>
 
+    <div style="height: 40px;"></div>
+
+    <div style="border-top-style: solid; background-color: powderblue;height: 60px;text-align:right;">
+        <div>&nbsp;</div>
+        <div>&nbsp;</div>
+        <div style="text-align:right;width:20%">LvGuard 2018</div>
+    </div>
 
 </body>
 

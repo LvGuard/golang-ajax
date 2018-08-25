@@ -1,13 +1,13 @@
 <table id="DataTable" cellspacing=3><tbody>
     <tr>
         <th style="visibility:hidden;">Cid</th>
-        <th onclick="ChangeOrder('2')"><div id="HeaderFirstName">First Name*</div></th>
-        <th onclick="ChangeOrder('3')"><div id="HeaderLastName">Last Name*</div></th>
-        <th onclick="ChangeOrder('4')"><div id="HeaderBirthDate">Birth Date*</div></th>
-        <th onclick="ChangeOrder('5')"><div id="HeaderGender">Gender*</div></th>
-        <th onclick="ChangeOrder('6')"><div id="HeaderEmail">Email*</div></th>
-        <th onclick="ChangeOrder('7')"><div id="HeaderAddress">Address</div></th>
-        <th onclick="ChangeOrder('8')"><div id="HeaderLastUpdate">Last Update</div></th>
+        <th onclick="ChangeOrder('2')"><div id="HeaderFirstName">{{.LNG "FIRST_NAME"}}*</div></th>
+        <th onclick="ChangeOrder('3')"><div id="HeaderLastName">{{.LNG "LAST_NAME"}}*</div></th>
+        <th onclick="ChangeOrder('4')"><div id="HeaderBirthDate">{{.LNG "BIRTH_DATE"}}*</div></th>
+        <th onclick="ChangeOrder('5')"><div id="HeaderGender">{{.LNG "GENDER"}}*</div></th>
+        <th onclick="ChangeOrder('6')"><div id="HeaderEmail">{{.LNG "EMAIL"}}*</div></th>
+        <th onclick="ChangeOrder('7')"><div id="HeaderAddress">{{.LNG "ADDRESS"}}</div></th>
+        <th onclick="ChangeOrder('8')"><div id="HeaderLastUpdate">{{.LNG "LAST_UPDATE"}}</div></th>
     </tr>
     {{ if .Customers}} {{range .Customers}}
     <tr>
@@ -15,7 +15,11 @@
         <td><input type="text" id="FirstName{{.Cid}}" maxlength="100" name="{{.FirstName}}" value="{{.FirstName}}" onchange="UpdateValue('FirstName',{{.Cid}})"></td>
         <td><input type="text" id="LastName{{.Cid}}" maxlength="100" name="{{.LastName}}" value="{{.LastName}}" onchange="UpdateValue('LastName',{{.Cid}})"></td>
         <td><input type="text" id="BirthDate{{.Cid}}" maxlength="0" name="{{.BirthDate}}" value="{{.BirthDate}}" onchange="UpdateValue('BirthDate',{{.Cid}})"></td>
-        <td><input type="text" id="Gender{{.Cid}}" maxlength="6" name="{{.Gender}}" value="{{.Gender}}" onchange="UpdateValue('Gender',{{.Cid}})"></td>
+        <td><select id="Gender{{.Cid}}" name="{{.Gender}}" onchange="UpdateValue('Gender',{{.Cid}})">
+            <option value="Male" {{ if .IsSelectedGender "Male" }}selected{{ end }}>{{$.LNG "GENDER_MALE"}}</option>
+            <option value="Female" {{ if .IsSelectedGender "Female" }}selected{{ end }}>{{$.LNG "GENDER_FEMALE"}}</option>
+            </select>
+        </td>
         <td><input type="text" id="Email{{.Cid}}" maxlength="100" name="{{.Email}}" value="{{.Email}}" onchange="UpdateValue('Email',{{.Cid}})"></td>
         <td><input type="text" id="Address{{.Cid}}" maxlength="200" name="{{.Address}}" value="{{.Address}}" onchange="UpdateValue('Address',{{.Cid}})"></td>
         <td><div id="LastUpdate{{.Cid}}">{{.LastUpdate}}</div></td>
@@ -23,7 +27,7 @@
     {{end}} {{else}}
     <tr>
         <td style="visibility:hidden;">-1</td>
-        <td colspan=7 align="center">No rows selected</td>
+        <td colspan=7 align="center">{{$.LNG "NO_ROWS_SELECTED"}}</td>
     </tr>
     {{end}}
 </tbody></table>
