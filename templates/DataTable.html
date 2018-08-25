@@ -1,13 +1,13 @@
 <table id="DataTable" cellspacing=3><tbody>
     <tr>
         <th style="visibility:hidden;">Cid</th>
-        <th onclick="ChangeOrder('2')"><div id="HeaderFirstName">{{.LNG "FIRST_NAME"}}*</div></th>
-        <th onclick="ChangeOrder('3')"><div id="HeaderLastName">{{.LNG "LAST_NAME"}}*</div></th>
-        <th onclick="ChangeOrder('4')"><div id="HeaderBirthDate">{{.LNG "BIRTH_DATE"}}*</div></th>
-        <th onclick="ChangeOrder('5')"><div id="HeaderGender">{{.LNG "GENDER"}}*</div></th>
-        <th onclick="ChangeOrder('6')"><div id="HeaderEmail">{{.LNG "EMAIL"}}*</div></th>
-        <th onclick="ChangeOrder('7')"><div id="HeaderAddress">{{.LNG "ADDRESS"}}</div></th>
-        <th onclick="ChangeOrder('8')"><div id="HeaderLastUpdate">{{.LNG "LAST_UPDATE"}}</div></th>
+        <th><a href="" onclick="ChangeOrder('2');return false;">{{.LNG "FIRST_NAME"}}*</a></th>
+        <th><a href="" onclick="ChangeOrder('3');return false;">{{.LNG "LAST_NAME"}}*</a></th>
+        <th><a href="" onclick="ChangeOrder('4');return false;">{{.LNG "BIRTH_DATE"}}*</a></th>
+        <th><a href="" onclick="ChangeOrder('5');return false;">{{.LNG "GENDER"}}*</a></th>
+        <th><a href="" onclick="ChangeOrder('6');return false;">{{.LNG "EMAIL"}}*</a></th>
+        <th><a href="" onclick="ChangeOrder('7');return false;">{{.LNG "ADDRESS"}}</a></th>
+        <th><a href="" onclick="ChangeOrder('8');return false;">{{.LNG "LAST_UPDATE"}}</a></th>
     </tr>
     {{ if .Customers}} {{range .Customers}}
     <tr>

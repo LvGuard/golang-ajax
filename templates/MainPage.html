@@ -32,6 +32,12 @@
                         $("#MessageError").text(r.ResponseError);
                         $("#MessageSuccess").text(r.ResponseSuccess);
                         if (!r.ResponseError) {
+                            $("#InsertFirstName").val("")
+                            $("#InsertLastName").val("")
+                            $("#InsertBirthDate").val("")
+                            $("#InsertGender").val("Male")
+                            $("#InsertEmail").val("")
+                            $("#InsertAddress").val("")
                             DisplayDataTable();
                         }
                     }
@@ -73,6 +79,22 @@
                 }
             }
         });
+    };
+    function CheckDuplicate() {
+        if ( ($("#InsertFirstName").val().length>0)&&($("#InsertLastName").val().length>0)&&($("#InsertBirthDate").val().length>0) ) {
+            $.ajax({
+                url: '/CheckDuplicate?lng='+$("#Language").val(),
+                type: "post",
+                contentType: 'application/json; charset=utf-8',
+                data: JSON.stringify({ FirstName: $("#InsertFirstName").val(),
+                                       LastName: $("#InsertLastName").val(),
+                                       BirthDate: $("#InsertBirthDate").val() }),
+                dataType: 'json',
+                success: function(r) {
+                    $("#MessageError").text(r.ResponseError);
+                }
+            });
+        }
     };
     function UpdateValue(fieldToUpdate, cid) {
         document.getElementById(fieldToUpdate+cid).style.backgroundColor = "";
@@ -144,7 +166,6 @@
                 }
                 break;
         }
-        //DisplayDataTable();
     };
     </script>
 </head>
@@ -168,9 +189,9 @@
                 <th></th>
             </tr>
             <tr>
-                <td><input type="text" id="InsertFirstName" maxlength="100"></td>
-                <td><input type="text" id="InsertLastName" maxlength="100"></td>
-                <td><input type="text" id="InsertBirthDate" maxlength="10"></td>
+                <td><input type="text" id="InsertFirstName" maxlength="100" onchange="CheckDuplicate()"></td>
+                <td><input type="text" id="InsertLastName" maxlength="100" onchange="CheckDuplicate()"></td>
+                <td><input type="text" id="InsertBirthDate" maxlength="10" onchange="CheckDuplicate()"></td>
                 <td><select id="InsertGender">
                     <option value="Male">{{.LNG "GENDER_MALE"}}</option>
                     <option value="Female">{{.LNG "GENDER_FEMALE"}}</option>
