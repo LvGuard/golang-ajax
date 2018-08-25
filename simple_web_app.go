@@ -482,6 +482,58 @@ func InsertHandler(w http.ResponseWriter, r *http.Request) {
     w.Write(a)
 }
 
+func DuplicateExists(c *Customer, language string) bool {
+    var duplicateCount int
+    query := `
+        SELECT count(1) DuplicateCount
+          FROM Customers
+         WHERE FirstName = $1
+           AND LastName  = $2
+           AND BirthDate = $3;`
+    rows, err := db.Query(query, c.FirstName, c.LastName, c.BirthDate)
+    if err != nil {
+        fmt.Println("psql chk1: " + err.Error())
+        return false
+    }
+    for rows.Next() {
+        err = rows.Scan(&duplicateCount)
+        if err != nil {
+            fmt.Println("psql chk2: " + err.Error())
+            return false
+        }
+    }
+
+    if (duplicateCount > 0) {
+        c.ResponseError = GetLngData("SUCH_COMBINATION_ALREADY_EXISTS", language)
+        return true
+    } 
+    return false
+}
+
+func CheckDuplicateHandler(w http.ResponseWriter, r *http.Request) {
+    language := GetLng(r.URL.RawQuery)
+
+    //parse request to struct
+    var c Customer
+    err := json.NewDecoder(r.Body).Decode(&c)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+    }
+
+    res, _, _ := IsValidBirthDate(c.BirthDate, language)
+    
+    if (res) {
+        _ = DuplicateExists(&c, language)
+    }
+
+    // create json response from struct
+    a, err := json.Marshal(c)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+    }
+    w.Write(a)
+}
+
 func UpdateHandler(w http.ResponseWriter, r *http.Request) {
     language := GetLng(r.URL.RawQuery)
 
@@ -539,6 +591,7 @@ func main() {
     http.HandleFunc("/", DefaultHandler)
     http.HandleFunc("/DataTable", DataTableHandler)
     http.HandleFunc("/Insert", InsertHandler)
+    http.HandleFunc("/CheckDuplicate", CheckDuplicateHandler)
     http.HandleFunc("/Update", UpdateHandler)
     http.ListenAndServe(":8080", nil)
 
